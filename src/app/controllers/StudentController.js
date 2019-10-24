@@ -16,6 +16,11 @@ class StudentController {
 
     return res.json({ id, name, email, age, weight, height });
   }
+
+  async update(req, res) {
+    console.log(req.userId);
+    res.json({ ok: true });
+  }
 }
 
 export default new StudentController();
