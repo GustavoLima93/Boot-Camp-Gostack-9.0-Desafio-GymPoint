@@ -1,11 +1,18 @@
 import * as Yup from 'yup';
-import { isBefore, addMonths, parseISO, startOfDay, format } from 'date-fns';
-import pt from 'date-fns/locale/pt';
+import {
+  isBefore,
+  addMonths,
+  parseISO,
+  startOfDay,
+  differenceInMinutes,
+} from 'date-fns';
+
 import { Op } from 'sequelize';
 import Registration from '../models/Registration';
 import Plan from '../models/Plan';
 import Student from '../models/Student';
-import Mail from '../../lib/Mail';
+import RegistrationMail from '../jobs/RegistrationMail';
+import Queue from '../../lib/Queue';
 
 class RegistrationController {
   async index(req, res) {
@@ -94,24 +101,15 @@ class RegistrationController {
 
     const student = await Student.findByPk(student_id);
 
-    await Mail.sendMail({
-      to: `${student.name} <${student.email}>`,
-      subject: 'Matricula efetuada com sucesso',
-      template: 'confirmation',
-      context: {
-        student: student.name,
-        plan: plan.title,
-        date: format(end_date, "'dia' dd 'de' MMMM', às ' H:mm'h'", {
-          locale: pt,
-        }),
-        price,
-      },
-    });
+    const informationMail = { student, plan, end_date, price };
+
+    await Queue.add(RegistrationMail.key, { informationMail });
 
     return res.json({ id, startDate, end_date, price, student_id, plan_id });
   }
 
   async update(req, res) {
+    /** validations */
     const schema = Yup.object().shape({
       start_date: Yup.date(),
       plan_id: Yup.number(),
@@ -129,6 +127,8 @@ class RegistrationController {
       return res.status(400).json({ error: 'Validation fails' });
     }
 
+    /** end validations */
+
     const { id } = req.params;
     const { start_date, plan_id } = req.body;
 
@@ -136,6 +136,17 @@ class RegistrationController {
 
     if (!registration) {
       return res.status(400).json({ error: 'Enrolled not found' });
+    }
+
+    const blockMultiplesUpdates = differenceInMinutes(
+      new Date(),
+      registration.updated_at
+    );
+
+    if (blockMultiplesUpdates < 5) {
+      return res
+        .status(400)
+        .json({ error: 'plan created or updated in the last five minutes.' });
     }
 
     /**
