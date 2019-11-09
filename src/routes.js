@@ -1,11 +1,15 @@
 import { Router } from 'express';
+
 import authMiddleware from './app/middlewares/auth';
 import StudentController from './app/controllers/StudentController';
 import SessionController from './app/controllers/SessionController';
 import PlanController from './app/controllers/PlanController';
 import RegistrationController from './app/controllers/RegistrationController';
+import CheckinController from './app/controllers/CheckinController';
 
 const routes = new Router();
+
+routes.get('/students/:id/checkins', CheckinController.store);
 
 routes.post('/sessions', SessionController.store);
 routes.use(authMiddleware);
