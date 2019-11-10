@@ -1,3 +1,5 @@
+import * as Yup from 'yup';
+
 import { subDays } from 'date-fns';
 import { Op } from 'sequelize';
 import Checkin from '../models/Checkin';
@@ -5,6 +7,14 @@ import Student from '../models/Student';
 
 class CheckinController {
   async store(req, res) {
+    const schemaParms = Yup.object().shape({
+      id: Yup.number().required(),
+    });
+
+    if (!(await schemaParms.isValid(req.params))) {
+      return res.status(400).json({ error: 'Validation fails' });
+    }
+
     const initDate = subDays(new Date(), 7);
     const lastDate = new Date();
 
